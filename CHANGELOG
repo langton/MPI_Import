@@ -1,0 +1,5 @@
+2012-01-13  Asher Langton  <langton2@llnl.gov>
+
+	* MPI_Import.py: Initial public release. Testing was done on
+	Python 2.6. There's been a report of an incompatibility with
+	Python 2.7; I should have a fix available soon.
