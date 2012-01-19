@@ -258,9 +258,6 @@ def __import_module__(partname, fqname, parent):
         setattr(parent, partname, m)
     return m
 
-
-# The remaining functions are taken unmodified (except for the names)
-# from knee.py.
 def __determine_parent__(globals):
     if not globals or not globals.has_key("__name__"):
         return None
@@ -282,6 +279,8 @@ def __determine_parent__(globals):
         return parent
     return None
 
+# The remaining functions are taken unmodified (except for the names)
+# from knee.py.
 def __find_head_package__(parent, name):
     if '.' in name:
         i = name.find('.')
