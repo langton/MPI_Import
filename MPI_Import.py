@@ -262,7 +262,7 @@ def __import_module__(partname, fqname, parent):
 # The remaining functions are taken unmodified (except for the names)
 # from knee.py.
 def __determine_parent__(globals):
-    if not globals or  not globals.has_key("__name__"):
+    if not globals or not globals.has_key("__name__"):
         return None
     pname = globals['__name__']
     if globals.has_key("__path__"):
@@ -272,6 +272,11 @@ def __determine_parent__(globals):
     if '.' in pname:
         i = pname.rfind('.')
         pname = pname[:i]
+        # One consequence of not handling import levels correctly is that
+        # we can end up with a name like "parent." here. As a workaround,
+        # we'll fix pname.
+        while pname[-1] == ".":
+            pname = pname[:-1]
         parent = sys.modules[pname]
         assert parent.__name__ == pname
         return parent
