@@ -1,3 +1,8 @@
+2012-03-08  Asher Langton  <langton2@llnl.gov>
+
+	* cached_import.py: Preliminary version. This is intended to
+	replace MPI_Import.py, but it has not been thoroughly tested yet.
+
 2012-01-18  Asher Langton  <langton2@llnl.gov>
 
 	* MPI_Import.py: Fixed a bug (reported and diagnosed by Matthew Turk)
