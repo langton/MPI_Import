@@ -1,5 +1,13 @@
 2012-03-08  Asher Langton  <langton2@llnl.gov>
 
+	* cached_import.py: Typo prevented process_files from being called
+	in when prepend=False. This caused some modules to fall back to
+	the default loader.
+	* tests/testOrder.py: We now print out the loader used to load a
+	module, to catch errors like the one above.
+
+2012-03-08  Asher Langton  <langton2@llnl.gov>
+
 	* cached_import.py: Fixed an ordering issue with prepended
 	directories
 	* tests/: New directory. Relocated one existing test, added

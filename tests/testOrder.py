@@ -44,20 +44,20 @@ sys.meta_path.append(finder())
 
 # TODO: check that these are correct, instead of just printing stuff out.
 import f1
-print "f1",f1.__file__
+print "f1",f1.__file__,getattr(f1,"__loader__","(default loader)")
 import f2
-print "f2",f2.__file__
+print "f2",f2.__file__,getattr(f2,"__loader__","(default loader)")
 import f3
-print "f3",f3.__file__
+print "f3",f3.__file__,getattr(f3,"__loader__","(default loader)")
 sys.path.insert(0,dir2)
 import f4
-print "f4",f4.__file__
+print "f4",f4.__file__,getattr(f4,"__loader__","(default loader)")
 sys.path.append(dir3)
 import f5
-print "f5",f5.__file__
+print "f5",f5.__file__,getattr(f5,"__loader__","(default loader)")
 import f6
-print "f6",f6.__file__
+print "f6",f6.__file__,getattr(f6,"__loader__","(default loader)")
 import f7
-print "f7",f7.__file__
+print "f7",f7.__file__,getattr(f7,"__loader__","(default loader)")
 from f8 import f9
-print "f9",f9.__file__
+print "f9",f9.__file__,getattr(f9,"__loader__","(default loader)")

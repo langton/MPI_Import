@@ -171,7 +171,7 @@ class finder(object):
             process_subdirs()
         else:
             process_subdirs()
-            process_files
+            process_files()
 
                                 
 """Finder that lets one MPI process do all of the initial caching.
