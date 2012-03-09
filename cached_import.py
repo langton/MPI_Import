@@ -43,7 +43,8 @@ class finder(object):
                 self._process_dir(os.path.realpath(d))
 
     def find_module(self,fullname,path=None):
-        """Return self if 'fullname' is in sys.path (excludes builtins, etc.)"""
+        """Return self if 'fullname' is in sys.path (and isn't a builtin or
+        frozen module)."""
         # First, make sure our cache is up-to-date.
         if sys.path != self._syspath:
             stored_length = len(self._syspath)
@@ -110,6 +111,9 @@ class finder(object):
         prepend -- True if dir has just been prepended to sys.path. In that
                    case, we'll replace existing cached entries with the same
                    module name.
+        visited -- list of the real paths of visited directories. Used to
+                   prevent infinite recursion in the case of symlink cycles
+                   in package subdirectories.
         """
         import stat
 
@@ -147,13 +151,15 @@ class finder(object):
         # nested functions.
         def process_subdirs():
             for d in subdirs:
-                fqname = parent+"."+d if parent else d # fully qualified mod name
+                fqname = parent+"."+d if parent else d # fully qualified name
                 # A package directory must have an __init__.py.
                 init_py = os.path.join(subdirs[d],"__init__.py")
                 if (os.path.isfile(init_py)) and os.access(init_py,os.R_OK):
                     if fqname not in self._cache or prepend:
-                        self._cache[fqname] = (subdirs[d],('','',imp.PKG_DIRECTORY))
-                        self._process_dir(os.path.join(dir,d),fqname,prepend,visited)
+                        self._cache[fqname] = (subdirs[d],
+                                               ('','',imp.PKG_DIRECTORY))
+                        self._process_dir(os.path.join(dir,d),
+                                          fqname,prepend,visited)
 
         def process_files():
             ordered_suffixes = self._rsuffixes if prepend else self._suffixes
@@ -164,7 +170,8 @@ class finder(object):
                     if f[-l:] == s:
                         fqname = parent+"."+f[:-l] if parent else f[:-l]
                         if fqname not in self._cache or prepend:
-                                self._cache[fqname] = (files[f],self._suffix_tuples[s])
+                                self._cache[fqname] = (files[f],
+                                                       self._suffix_tuples[s])
 
         if prepend:
             process_files()
