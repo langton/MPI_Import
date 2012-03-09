@@ -17,19 +17,25 @@ dir1/
    f8/
       __init__.py
       f9/
-         __init__.py
+         __init__.py (*)
       f9.py
 dir2/ (prepended after finder is created)
    f4.py (*)
-   f6/ (*)
-       __init__.py
+   f6/
+       __init__.py (*)
    f6.py
 dir3/ (appended after f4 is imported)
    f5.py
-   f7/ (*)
-      __init__.py
+   f7/
+      __init__.py (*)
    f7.py
-   
+
+f1.so and f2.so are both C-extensions, so they need to be compiled first. From
+inside dir1, execute "python setup.py build_ext --inplace" to build these
+modules.
+
+This test just checks the __file__ and __loader__ attributes of a module, not
+whether the loaded modules function correctly.
 """
 
 import sys,os
@@ -40,24 +46,58 @@ dir2 = os.path.join(scriptpath,"dir2")
 dir3 = os.path.join(scriptpath,"dir3")
 sys.path.append(dir1)
 from cached_import import finder
-sys.meta_path.append(finder())
+my_importer = finder()
+sys.meta_path.append(my_importer)
 
-# TODO: check that these are correct, instead of just printing stuff out.
 import f1
-print "f1",f1.__file__,getattr(f1,"__loader__","(default loader)")
 import f2
-print "f2",f2.__file__,getattr(f2,"__loader__","(default loader)")
 import f3
-print "f3",f3.__file__,getattr(f3,"__loader__","(default loader)")
 sys.path.insert(0,dir2)
 import f4
-print "f4",f4.__file__,getattr(f4,"__loader__","(default loader)")
 sys.path.append(dir3)
 import f5
-print "f5",f5.__file__,getattr(f5,"__loader__","(default loader)")
 import f6
-print "f6",f6.__file__,getattr(f6,"__loader__","(default loader)")
 import f7
-print "f7",f7.__file__,getattr(f7,"__loader__","(default loader)")
 from f8 import f9
-print "f9",f9.__file__,getattr(f9,"__loader__","(default loader)")
+
+def check(modules):
+    # For Python source files, either the source or bytecode file
+    # could have been loaded.
+    correct = { "f1" : [os.path.join(dir1,"f1","__init__.py"),
+                        os.path.join(dir1,"f1","__init__.pyc"),
+                        os.path.join(dir1,"f1","__init__.pyo")],
+                "f2" : [os.path.join(dir1,"f2.so")],
+                "f3" : [os.path.join(dir1,"f3.py"),
+                        os.path.join(dir1,"f3.pyc"),
+                        os.path.join(dir1,"f3.pyo")],
+                "f4" : [os.path.join(dir2,"f4.py"),
+                        os.path.join(dir2,"f4.pyc"),
+                        os.path.join(dir2,"f4.pyo")],
+                "f5" : [os.path.join(dir1,"f5.py"),
+                        os.path.join(dir1,"f5.pyc"),
+                        os.path.join(dir1,"f5.pyo")],
+                "f6" : [os.path.join(dir2,"f6","__init__.py"),
+                        os.path.join(dir2,"f6","__init__.pyc"),
+                        os.path.join(dir2,"f6","__init__.pyo")],
+                "f7" : [os.path.join(dir3,"f7","__init__.py"),
+                        os.path.join(dir3,"f7","__init__.pyc"),
+                        os.path.join(dir3,"f7","__init__.pyo")],
+                "f8.f9" : [os.path.join(dir1,"f8","f9","__init__.py"),
+                        os.path.join(dir1,"f8","f9","__init__.pyc"),
+                        os.path.join(dir1,"f8","f9","__init__.pyo")],
+                }
+    alltests = True
+    for mod in modules:
+        match = False
+        for fname in correct[mod.__name__]:
+            if os.path.exists (fname) and os.path.samefile(mod.__file__,fname):
+                match = True
+                break
+        ldr = getattr(mod,"__loader__",None)
+        if not match or ldr != my_importer:
+            print "FAILED:",mod.__name__,mod.__file__,ldr
+            alltests = False
+    if alltests:
+        print "All tests passed."
+
+check([f1,f2,f3,f4,f5,f6,f7,f9])

@@ -1,8 +1,14 @@
 2012-03-08  Asher Langton  <langton2@llnl.gov>
 
+	* tests/testOrder.py: Reorganized so the test indicates whether it
+	passed or failed.
+	* tests/: Added a few more error messages in 'wrong' modules
+
+2012-03-08  Asher Langton  <langton2@llnl.gov>
+
 	* cached_import.py: Typo prevented process_files from being called
-	in when prepend=False. This caused some modules to fall back to
-	the default loader.
+	when prepend=False. This caused some modules to fall back to the
+	default loader.
 	* tests/testOrder.py: We now print out the loader used to load a
 	module, to catch errors like the one above.
 
