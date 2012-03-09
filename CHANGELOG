@@ -1,5 +1,12 @@
 2012-03-08  Asher Langton  <langton2@llnl.gov>
 
+	* cached_import.py: Fixed an ordering issue with prepended
+	directories
+	* tests/: New directory. Relocated one existing test, added
+	a (skeleton of a) sanity check for cached_import.py.
+
+2012-03-08  Asher Langton  <langton2@llnl.gov>
+
 	* cached_import.py: Preliminary version. This is intended to
 	replace MPI_Import.py, but it has not been thoroughly tested yet.
 

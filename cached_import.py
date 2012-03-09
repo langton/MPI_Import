@@ -142,27 +142,38 @@ class finder(object):
             elif stat.S_ISREG(mode) and os.access(contents[entry],os.R_OK):
                 files[entry] = contents[entry]
 
-        # Package directories have the highest precedence.
-        for d in subdirs:
-            fqname = parent+"."+d if parent else d # fully qualified mod name
-            # A package directory must have an __init__.py.
-            init_py = os.path.join(subdirs[d],"__init__.py")
-            if (os.path.isfile(init_py)) and os.access(init_py,os.R_OK):
-                if fqname not in self._cache or prepend:
-                    self._cache[fqname] = (subdirs[d],('','',imp.PKG_DIRECTORY))
-                    self._process_dir(os.path.join(dir,d),fqname,prepend,visited)
-
-        ordered_suffixes = self._rsuffixes if prepend else self._suffixes
-        for s in ordered_suffixes:
-            l = len(s)
-            for f in files:
-                # Check for matching suffix.
-                if f[-l:] == s:
-                    fqname = parent+"."+f[:-l] if parent else f[:-l]
+        # Package directories have the highest precedence. But when prepend is
+        # True, we need to reverse the order here. We'll do this with these
+        # nested functions.
+        def process_subdirs():
+            for d in subdirs:
+                fqname = parent+"."+d if parent else d # fully qualified mod name
+                # A package directory must have an __init__.py.
+                init_py = os.path.join(subdirs[d],"__init__.py")
+                if (os.path.isfile(init_py)) and os.access(init_py,os.R_OK):
                     if fqname not in self._cache or prepend:
-                            self._cache[fqname] = (files[f],self._suffix_tuples[s])
+                        self._cache[fqname] = (subdirs[d],('','',imp.PKG_DIRECTORY))
+                        self._process_dir(os.path.join(dir,d),fqname,prepend,visited)
 
-                            
+        def process_files():
+            ordered_suffixes = self._rsuffixes if prepend else self._suffixes
+            for s in ordered_suffixes:
+                l = len(s)
+                for f in files:
+                    # Check for matching suffix.
+                    if f[-l:] == s:
+                        fqname = parent+"."+f[:-l] if parent else f[:-l]
+                        if fqname not in self._cache or prepend:
+                                self._cache[fqname] = (files[f],self._suffix_tuples[s])
+
+        if prepend:
+            process_files()
+            process_subdirs()
+        else:
+            process_subdirs()
+            process_files
+
+                                
 """Finder that lets one MPI process do all of the initial caching.
 """
 class mpi_finder(finder):        
