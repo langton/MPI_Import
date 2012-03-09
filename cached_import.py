@@ -22,8 +22,9 @@ sys.meta_path.append(finder())   # or mpi_finder
 import imp,sys,os
 
 class finder(object):
-    def __init__(self,build=True):
+    def __init__(self,skip_checks=True,build=True):
         t = imp.get_suffixes()
+        self.skip_checks = skip_checks
         self._suffixes = [x[0] for x in t] # in order of precedence
         self._rsuffixes = self._suffixes[::-1] # and in reverse order
         self._suffix_tuples = dict((x[0],tuple(x)) for x in t)
@@ -38,7 +39,7 @@ class finder(object):
         """Traverse sys.path, building (or re-building) the cache."""
         import os
         self._cache = {}
-        for d in sys.path:
+        for d in self._syspath:
             if os.path.isdir(d):
                 self._process_dir(os.path.realpath(d))
 
@@ -71,7 +72,7 @@ class finder(object):
         if (fullname not in sys.builtin_module_names and
             not imp.is_frozen(fullname) and
             fullname in self._cache):
-            # print "__IMPORTING ",fullname
+            #print "__IMPORTING ",fullname
             return self
         return None
 
@@ -81,7 +82,7 @@ class finder(object):
             if fullname in sys.modules:
                 return sys.modules[fullname]
             pathname,desc = self._cache[fullname]
-            # print "__LOADING ",fullname,pathname
+            #print "__LOADING ",fullname,pathname
             if os.path.isfile(pathname):
                 # (If we're loading a PY_SOURCE file, the interpreter will
                 # automatically check for a compiled (.py[c|o]) file.)
@@ -102,7 +103,7 @@ class finder(object):
     #
     # Rather than add a lot of checks here to make sure we don't stomp on a
     # builtin module, we'll just reject these in find_module
-    def _process_dir(self,dir,parent=None,prepend=False,visited=[]):
+    def _process_dir(self,dir,parent=None,prepend=False,visited=None):
         """Process a directory dir, looking for valid modules.
 
         Arguments:
@@ -116,11 +117,14 @@ class finder(object):
                    in package subdirectories.
         """
         import stat
-
+        
         # Avoid symlink cycles in a package.
-        if dir in visited:
+        if not visited:
+            visited = [dir]
+        elif dir not in visited:
+            visited.append(dir)
+        else:
             return
-        visited.append(dir)
 
         # All files and subdirs. Store the name and the path.
         try:
@@ -129,6 +133,20 @@ class finder(object):
         # Unreadable directory, so skip
         except OSError:
             return
+
+        # If this is a possible package directory with no __init__.py, bail
+        # out. If __init__.py is there, we need to see if there's an exising
+        # module by that name. 
+        if parent:
+            if "__init__.py" not in contents:
+                return
+            if not (self.skip_checks or
+                    os.access(os.path.join(dir,"__init__.py"),os.R_OK)):
+                return
+            if parent in self._cache and not prepend:
+                return
+            # Okay, this is a valid, non-duplicate module.
+            self._cache[parent] = (dir,('','',imp.PKG_DIRECTORY))
             
         # Split contents into files & subdirs (only stat each one once)
         files = {}
@@ -137,13 +155,12 @@ class finder(object):
             try:
                 mode = os.stat(contents[entry]).st_mode
             except OSError:
-                return # couldn't read!
-            # Checking whether these are readable using os.access
-            # requires a second stat. Argh. It's tricky to get that
-            # information directory from os.stat, though.
-            if stat.S_ISDIR(mode) and os.access(contents[entry],os.R_OK):
+                continue # couldn't read!
+            if stat.S_ISDIR(mode): #and (self.skip_checks or
+                                  #     os.access(contents[entry],os.R_OK)):
                 subdirs[entry] = contents[entry]
-            elif stat.S_ISREG(mode) and os.access(contents[entry],os.R_OK):
+            elif stat.S_ISREG(mode):# and (self.skip_checks or
+                                    #     os.access(contents[entry],os.R_OK)):
                 files[entry] = contents[entry]
 
         # Package directories have the highest precedence. But when prepend is
@@ -152,14 +169,7 @@ class finder(object):
         def process_subdirs():
             for d in subdirs:
                 fqname = parent+"."+d if parent else d # fully qualified name
-                # A package directory must have an __init__.py.
-                init_py = os.path.join(subdirs[d],"__init__.py")
-                if (os.path.isfile(init_py)) and os.access(init_py,os.R_OK):
-                    if fqname not in self._cache or prepend:
-                        self._cache[fqname] = (subdirs[d],
-                                               ('','',imp.PKG_DIRECTORY))
-                        self._process_dir(os.path.join(dir,d),
-                                          fqname,prepend,visited)
+                self._process_dir(os.path.join(dir,d),fqname,prepend,visited)
 
         def process_files():
             ordered_suffixes = self._rsuffixes if prepend else self._suffixes
@@ -184,20 +194,15 @@ class finder(object):
 """Finder that lets one MPI process do all of the initial caching.
 """
 class mpi_finder(finder):        
-    def __init__(self):
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        if rank == 0:
-            finder.__init__(self)
+    def __init__(self,skip_checks=True):
+#        from mpi4py import MPI
+#        comm = MPI.COMM_WORLD
+#        rank = comm.Get_rank()
+        import mpi
+        if mpi.rank == 0:
+            finder.__init__(self,skip_checks)
         else:
-            finder.__init__(self,False)
-        self._syspath,self._cache = comm.bcast((self._syspath,self._cache))
-                        
-if __name__ == "__main__":
-    import sys
-    sys.meta_path.append(finder())
-    import numpy
-    # What did we import?
-    print numpy.__file__,numpy.__version__
+            finder.__init__(self,skip_checks,False)
+        self._syspath,self._cache = mpi.bcast((self._syspath,self._cache))
+
 
