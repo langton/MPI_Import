@@ -40,33 +40,41 @@ class finder(object):
         import os
         self._cache = {}
         for d in self._syspath:
-            if os.path.isdir(d):
-                self._process_dir(os.path.realpath(d))
+            self._process_dir(os.path.realpath(d))
 
     def find_module(self,fullname,path=None):
         """Return self if 'fullname' is in sys.path (and isn't a builtin or
         frozen module)."""
-        # First, make sure our cache is up-to-date.
+        # First, make sure our cache is up-to-date. (We could combine
+        # the append/prepend cases and more generally handle the case where
+        # self._syspath is a sublist of the new sys.path, but is that worth
+        # the effort? It's only beneficial if we encounter code where sys.path
+        # is both prepended to and appended to, and there isn't an import
+        # statement in between.
         if sys.path != self._syspath:
             stored_length = len(self._syspath)
             real_length = len(sys.path)
+            rebuild = False
             # If sys.path isn't bigger, we need to rebuild the cache
+            # but not before we update self._syspath.
             if real_length <= stored_length:
-                self._build_cache()
+                rebuild = True
             # Some directories were prepended to the path, so add them.
             elif self._syspath == sys.path[-stored_length:]:
                 for d in sys.path[real_length-stored_length-1::-1]:
-                    if os.path.isdir(d):
-                        self._process_dir(os.path.realpath(d),prepend=True)
+                    self._process_dir(os.path.realpath(d),prepend=True)
             # Directories appended to the path.
             elif self._syspath == sys.path[:len(self._syspath)]:
                 for d in sys.path[stored_length-real_length:]:
-                    if os.path.isdir(d):
-                        self._process_dir(os.path.realpath(d))
+                    self._process_dir(os.path.realpath(d))
             # Path otherwise modified, so we need to rebuild the cache.
             else:
-                self._build_cache()
+                rebuild = True
+
+            # Now update self._syspath
             self._syspath = list(sys.path)
+            if rebuild:
+                self._build_cache()
             
         # Don't override builtin/frozen modules. TODO: Windows registry?
         if (fullname not in sys.builtin_module_names and

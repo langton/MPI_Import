@@ -1,5 +1,12 @@
 2012-03-09  Asher Langton  <langton2@llnl.gov>
 
+	* cached_import.py: Removed the redundant isdir() checks in
+	_build_cache and find_module. Also fixed a bug related to
+	rebuilding the cache when sys.path is modified beyond a simple
+	prepend or append.
+
+2012-03-09  Asher Langton  <langton2@llnl.gov>
+
 	* cached_import.py: Added a constructor parameter skip_checks,
 	True by default, to skip the extra os.access check.
 	* tests/testOrder*.py: Duplicated test, with and without skip_checks
