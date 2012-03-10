@@ -164,11 +164,11 @@ class finder(object):
                 mode = os.stat(contents[entry]).st_mode
             except OSError:
                 continue # couldn't read!
-            if stat.S_ISDIR(mode): #and (self.skip_checks or
-                                  #     os.access(contents[entry],os.R_OK)):
+            if stat.S_ISDIR(mode) and (self.skip_checks or
+                                       os.access(contents[entry],os.R_OK)):
                 subdirs[entry] = contents[entry]
-            elif stat.S_ISREG(mode):# and (self.skip_checks or
-                                    #     os.access(contents[entry],os.R_OK)):
+            elif stat.S_ISREG(mode) and (self.skip_checks or
+                                         os.access(contents[entry],os.R_OK)):
                 files[entry] = contents[entry]
 
         # Package directories have the highest precedence. But when prepend is
