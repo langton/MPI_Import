@@ -201,11 +201,8 @@ class finder(object):
                                 
 """Finder that lets one MPI process do all of the initial caching.
 """
-class mpi_finder(finder):        
+class pympi_finder(finder):        
     def __init__(self,skip_checks=True):
-#        from mpi4py import MPI
-#        comm = MPI.COMM_WORLD
-#        rank = comm.Get_rank()
         import mpi
         if mpi.rank == 0:
             finder.__init__(self,skip_checks)
@@ -213,4 +210,15 @@ class mpi_finder(finder):
             finder.__init__(self,skip_checks,False)
         self._syspath,self._cache = mpi.bcast((self._syspath,self._cache))
 
-
+"""Finder that lets one MPI process do all of the initial caching.
+"""
+class mpi4py_finder(finder):        
+    def __init__(self,skip_checks=True):
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        if rank == 0:
+            finder.__init__(self,skip_checks)
+        else:
+            finder.__init__(self,skip_checks,False)
+        self._syspath,self._cache = comm.bcast((self._syspath,self._cache))

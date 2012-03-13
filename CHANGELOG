@@ -1,3 +1,8 @@
+2012-03-12  Asher Langton  <langton2@llnl.gov>
+
+	* cached_import.py: Split mpi_finder into mpi4py_finder and
+	pympi_finder.
+
 2012-03-09  Asher Langton  <langton2@llnl.gov>
 
 	* cached_import.py: Removed the redundant isdir() checks in
