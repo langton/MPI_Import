@@ -1,3 +1,12 @@
+2012-03-16  Asher Langton  <langton2@llnl.gov>
+
+	* cached_import.py: Added an alternate finder called simple_finder
+	that caches only the directory contents, not the locations of all
+	available modules. This appears to be comparable in speed to the
+	MPI-enabled versions of the other finder.
+	* tests/testOrder3.py: New; tests simple_finder.
+	* tests/testNumPy3.py: New; tests simple_finder.
+
 2012-03-12  Asher Langton  <langton2@llnl.gov>
 
 	* cached_import.py: Split mpi_finder into mpi4py_finder and

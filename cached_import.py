@@ -12,22 +12,60 @@ Known issues:
   there may be precedence issues. If a file disappears or its permissions
   change, the import will fail.
 
-To use, start a script off with the following:
+Update (3/16/12): I've merged in a new version, simple_finder, described
+below.
+
+To use the finder, start a script off with the following:
 
 import sys
-from cached_import import finder # or mpi_finder
-sys.meta_path.append(finder())   # or mpi_finder
+from cached_import import finder
+sys.meta_path.append(finder())
+
+There are also variants of the finder that use MPI. The rank 0 process
+builds the cache and then broadcasts it. For these, replace finder
+with either pympi_finder or mpi4py_finder.
+
+This finder works by building a cache mapping module names to
+locations. The expensive parts of this process are the calls that
+result in a stat. For that reason, we don't, by default, check whether
+a module file is readable.
+
+Since calls like os.isfile are expensive, I've added an alternate
+version called simple_finder. Instead of figuring out where all of the
+modules in sys.path are located, we just cache the contents of
+directories on sys.path and use the standard probing algorithm for the
+imports. This is much cheaper at startup and easier to maintain. It
+appears to be a bit faster than the MPI-enabled finders, though that
+will depend on the number of modules in sys.path as well as the number
+of modules actually imported.
 """
 
-import imp,sys,os
+import sys,os,imp
 
 class finder(object):
     def __init__(self,skip_checks=True,build=True):
+        """Build a finder object.
+
+        Arguments:
+        - skip_checks: Don't test whether modules are readable while building
+                       the cache. This improves performace, but can cause an
+                       unreadable file that looks like a Python module to
+                       shadow a readable module with the same name later
+                       in sys.path.
+        -build: if set, build the cache now. This is used in the mpi4py_finder
+                and pympi_finder extensions
+        """
+        # Store some suffix and module description information
         t = imp.get_suffixes()
         self.skip_checks = skip_checks
         self._suffixes = [x[0] for x in t] # in order of precedence
         self._rsuffixes = self._suffixes[::-1] # and in reverse order
         self._suffix_tuples = dict((x[0],tuple(x)) for x in t)
+
+        # We store the value of sys.path in _syspath so we can keep track
+        # of changes. _cache is a dictionary mapping module names to tuples
+        # containing the information needed to load the module (path and
+        # module description).
         if build:
             self._syspath = list(sys.path)
             self._build_cache()
@@ -222,3 +260,114 @@ class mpi4py_finder(finder):
         else:
             finder.__init__(self,skip_checks,False)
         self._syspath,self._cache = comm.bcast((self._syspath,self._cache))
+
+"""
+Alternate version of cached_import. Instead of caching locations,
+just cache directory contents. Then mimic the standard import probing
+algorithm.
+
+This has not been thoroughly tested!
+"""
+
+class simple_finder(object):    
+    def __init__(self):
+        # _contents is a representation of the files located in
+        # sys.path (including, in the case of module packages, any
+        # subdirectories that are encountered in the import process).
+        # For each string in sys.path or subdirectory visited,
+        # _contents contains a dict mapping the filenames in the
+        # directory to full paths. If the string doesn't represent a
+        # valid directory, then the dict is empty.
+        self._contents = {}
+        for d in sys.path:
+            self._process_dir(d)
+
+    # Search for a module 'name' in the cached directory listing for 'path'
+    def _search(self,name,path):
+        # If we haven't cached the directory, do so now.
+        if path not in self._contents:
+            self._process_dir(path)
+        listing = self._contents[path]
+        # First check for a package directory.
+        try:
+            if (name in listing and
+                os.path.isdir(listing[name]) and
+                os.path.isfile(os.path.join(listing[name],
+                                            "__init__.py"))):
+                return listing[name],('','',imp.PKG_DIRECTORY)
+        except OSError:
+            pass
+        # Now check probe for name.so, namemodule.so, name.py, etc.
+        for suffix in imp.get_suffixes():
+            s = name+suffix[0]
+            if (s in listing and
+                os.path.isfile(listing[s]) and
+                os.access(listing[s],os.R_OK)):
+                return listing[s],suffix
+        return None,None
+    
+    # Don't use this directly. We need more state than the load_module
+    # signature allows, so we'll return a loader object for any module
+    # that we have found.
+    class _loader(object):
+        def __init__(self,fullname,path,desc,finder):
+            self._fullname = fullname
+            self._path = path
+            self._desc = desc
+            self._finder = finder
+
+        def load_module(self,fullname):
+            """Load the module fullname using cached path."""
+            if fullname != self._fullname:
+                raise ImportError 
+            if os.path.isfile(self._path): # check desc instead?
+                with open(self._path,self._desc[1]) as f:
+                    mod = imp.load_module(fullname,f,self._path,self._desc)
+            # Not a file, so it's a package directory
+            else:
+                mod = imp.load_module(fullname,None,self._path,self._desc)
+            mod.__loader__ = self._finder
+            return mod
+
+    # "Loader" for modules that have already been imported.
+    class _null_loader(object):
+        def load_module(self,fullname):
+            return sys.modules[fullname]
+
+    def find_module(self,fullname,path=None):
+        """Return self if 'fullname' is in sys.path (and isn't a builtin or
+        frozen module)."""
+        if fullname in sys.modules:
+            return simple_finder._null_loader()
+        # Don't override builtin/frozen modules. TODO: Windows registry?
+        if (fullname not in sys.builtin_module_names and
+            not imp.is_frozen(fullname)):
+            if path:
+                iterpath = path
+                name = fullname.split('.')[-1]
+            else:
+                iterpath = sys.path
+                name = fullname
+            for dir in iterpath:
+                loadpath,desc = self._search(name,dir)
+                if loadpath:
+                    break
+            #print "__IMPORTING ",fullname
+            if loadpath:
+                return simple_finder._loader(fullname,loadpath,desc,self)
+        return None
+
+    def _process_dir(self,dir):
+        """
+        Arguments:
+        dir -- 
+        """
+        # All files and subdirs. Store the name and the path.
+        try:
+            contents = dict((x,os.path.join(dir,x))
+                            for x in os.listdir(dir))
+        # Unreadable directory, so skip
+        except OSError:
+            contents = {}
+
+        self._contents[dir] = contents
