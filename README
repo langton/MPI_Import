@@ -1,0 +1,35 @@
+This repository contains two different approaches to the Python import
+bottleneck:
+
+1) MPI_Import.py
+MPI_Import.py is a replacement for the standard import mechanism. It
+can only be used in sections of the code that are synchronous, as
+every process depends on rank 0 to handle the the lookup portion of a
+module import. For details and usage instructions, see the docstring
+at the beginning of MPI_Import.py, as well as the following
+discussion:
+
+http://mail.scipy.org/pipermail/numpy-discussion/2012-January/059801.html
+
+
+2) cached_import.py
+cached_import.py is an attempt to improve on the performance and
+useability of MPI_Import through the use of PEP 302 finders and
+loaders. See the PyData panel discussion (starting aroung 1:07:00) and
+my post to the NumPy list for some background:
+
+http://marakana.com/s/2012_pydata_workshop_panel_with_guido_van_rossum,1091/index.html
+http://mail.scipy.org/pipermail/numpy-discussion/2012-March/061160.html
+
+There are two approaches. In the first (finder, along with
+mpi4py_finder and pympi_finder), the importer creates a dictionary of
+all modules in sys.path and uses this for any subsequent imports. Some
+performance details of that approach are here:
+
+https://groups.google.com/d/msg/mpi4py/h_GDdAUcviw/zx9BB8FKFZIJ
+
+The second approach (simple_finder) avoids the overhead of calling
+stat on every potential module file, and maintains a dictionary of the
+contents of sys.path, as well as the contents of package
+subdirectories as they're visited, and then uses the standard Python
+probing import method. This appears to be the best approach so far.
